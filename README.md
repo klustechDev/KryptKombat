@@ -1,13 +1,19 @@
-# Sample Hardhat Project
+# KryptKombat
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+KryptKombat is an ERC-721 based NFT project built using Solidity and Hardhat. This project allows users to mint and manage NFTs with custom error handling and ownership controls.
 
-Try running some of the following tasks:
+## Features
+- Mint NFTs using OpenZeppelin's ERC721 standard.
+- Secure access control using Ownable.
+- Detailed test coverage with Hardhat.
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.js
-```
+## Getting Started
+Clone the repository and follow the instructions in the `scripts` and `test` folders to deploy and test the contract locally.
+
+## Deployment
+- Use `npx hardhat run scripts/deploy.js --network localhost` to deploy locally.
+- Make sure to update your `.env` with appropriate values for deployment to testnets like Goerli.
+
+## License
+MIT License
+
