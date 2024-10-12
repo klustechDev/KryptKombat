@@ -1,92 +1,104 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 
-contract KryptKombat is ERC721, ERC2981, Ownable {
+contract KryptKombat is ERC721, Ownable {
+    uint256 public commonCount;
+    uint256 public uncommonCount;
+    uint256 public rareCount;
+    uint256 public epicCount;
+    uint256 public legendaryCount;
+
+    uint256 public constant COMMON_LIMIT = 100000;
+    uint256 public constant UNCOMMON_LIMIT = 10000;
+    uint256 public constant RARE_LIMIT = 1000;
+    uint256 public constant EPIC_LIMIT = 100;
+    uint256 public constant LEGENDARY_LIMIT = 10;
+
     uint256 public tokenCounter;
-    mapping(uint256 => string) public colors;
-    mapping(uint256 => uint256) private mintTimestamps;
+    mapping(uint256 => string) private _tokenColors;
 
-    constructor(address royaltyReceiver, uint96 royaltyFee)
-        ERC721("KryptKombat", "KKOMBAT")
-    {
-        tokenCounter = 0;
-        _setDefaultRoyalty(royaltyReceiver, royaltyFee);
+    constructor() ERC721("KryptKombat", "KKOMBAT") {}
+
+    function batchMint() external onlyOwner {
+        uint256 commonsToMint = 100;
+        uint256 uncommonsToMint = commonsToMint / 10;
+        uint256 raresToMint = uncommonsToMint / 10;
+        uint256 epicsToMint = raresToMint;
+        uint256 legendariesToMint = epicsToMint;
+
+        mintBatch(commonsToMint, "yellow", "common");
+        mintBatch(uncommonsToMint, "green", "uncommon");
+        mintBatch(raresToMint, "blue", "rare");
+        mintBatch(epicsToMint, "purple", "epic");
+        mintBatch(legendariesToMint, "red", "legendary");
     }
 
-    function createNFT(address to, string memory initialColor)
-        public
-        onlyOwner
-        returns (uint256)
-    {
-        uint256 newTokenId = tokenCounter;
-        _safeMint(to, newTokenId);
-        colors[newTokenId] = initialColor;
-        mintTimestamps[newTokenId] = block.timestamp;
-        tokenCounter += 1;
-        return newTokenId;
-    }
+    function mintBatch(uint256 amount, string memory color, string memory rarity) internal {
+        for (uint256 i = 0; i < amount; i++) {
+            if (keccak256(abi.encodePacked(rarity)) == keccak256("common")) {
+                require(commonCount < COMMON_LIMIT, "Max common limit reached");
+                commonCount++;
+            } else if (keccak256(abi.encodePacked(rarity)) == keccak256("uncommon")) {
+                require(uncommonCount < UNCOMMON_LIMIT, "Max uncommon limit reached");
+                uncommonCount++;
+            } else if (keccak256(abi.encodePacked(rarity)) == keccak256("rare")) {
+                require(rareCount < RARE_LIMIT, "Max rare limit reached");
+                rareCount++;
+            } else if (keccak256(abi.encodePacked(rarity)) == keccak256("epic")) {
+                require(epicCount < EPIC_LIMIT, "Max epic limit reached");
+                epicCount++;
+            } else if (keccak256(abi.encodePacked(rarity)) == keccak256("legendary")) {
+                require(legendaryCount < LEGENDARY_LIMIT, "Max legendary limit reached");
+                legendaryCount++;
+            }
 
-    function batchMint(address to, uint256 numberOfTokens, string memory color) public onlyOwner {
-        for (uint256 i = 0; i < numberOfTokens; i++) {
-            createNFT(to, color);
+            _safeMint(msg.sender, tokenCounter);
+            _tokenColors[tokenCounter] = color;
+            tokenCounter++;
         }
     }
 
-    function changeColor(uint256 tokenId, string memory newColor) public {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "Not owner nor approved");
-        colors[tokenId] = newColor;
-    }
-
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
+        string memory color = _tokenColors[tokenId];
+        string memory svg = Base64.encode(bytes(string(abi.encodePacked(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">',
+            '<rect width="100" height="100" fill="', color, '"/>',
+            '<text x="10" y="20" font-family="Arial" font-size="10" fill="black">KryptKombat</text>',
+            '<text x="10" y="40" font-family="Arial" font-size="10" fill="black">', color, '</text>',
+            '</svg>'
+        ))));
 
-        string memory svg = generateSVG(tokenId);
-        uint256 daysSinceMint = (block.timestamp - mintTimestamps[tokenId]) / 1 days;
-        string memory json = string(
-            abi.encodePacked(
-                '{"name": "KryptKombat #',
-                Strings.toString(tokenId),
-                '", "description": "A dynamic on-chain SVG-based NFT", "image": "data:image/svg+xml;base64,',
-                Base64.encode(bytes(svg)),
-                '", "attributes": [{"trait_type": "Color", "value": "',
-                colors[tokenId],
-                '"}, {"trait_type": "Days Since Mint", "value": "',
-                Strings.toString(daysSinceMint),
-                '"}]}'
-            )
-        );
-
-        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
+        return string(abi.encodePacked(
+            "data:application/json;base64,",
+            Base64.encode(bytes(abi.encodePacked(
+                '{"name": "KryptKombat #', uintToString(tokenId), '",',
+                '"description": "A dynamic on-chain SVG-based NFT",',
+                '"image": "data:image/svg+xml;base64,', svg, '",',
+                '"attributes": [{"trait_type": "Color", "value": "', color, '"}]}'
+            )))
+        ));
     }
 
-    function generateSVG(uint256 tokenId) internal view returns (string memory) {
-        string memory color = colors[tokenId];
-        uint256 daysSinceMint = (block.timestamp - mintTimestamps[tokenId]) / 1 days;
-
-        return string(
-            abi.encodePacked(
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">',
-                '<rect width="100" height="100" fill="', color, '"/>',
-                '<text x="10" y="20" font-family="Arial" font-size="10" fill="black">KryptKombat</text>',
-                '<text x="10" y="40" font-family="Arial" font-size="10" fill="black">Days Since Mint: ', Strings.toString(daysSinceMint), '</text>',
-                '</svg>'
-            )
-        );
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC721, ERC2981)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
+    function uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
 }
